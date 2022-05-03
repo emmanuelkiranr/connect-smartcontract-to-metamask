@@ -1,3 +1,6 @@
 [submodule "web3connect-html-js-ethers"]
 	path = web3connect-html-js-ethers
 	url = https://github.com/emmanuelkiranr/web3connect-html-js-ethers
+[submodule "web3connect-nextjs-ethers"]
+	path = web3connect-nextjs-ethers
+	url = https://github.com/emmanuelkiranr/web3connect-nextjs-ethers.git
