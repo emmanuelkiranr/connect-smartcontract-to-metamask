@@ -1,0 +1,219 @@
+Why we need to connect our smart contract code to users wallet? 
+
+To interact with the blockchain we need to connect to a node, Since these wallets are connected to the 
+blockchain we can use them to allow users to connect to blockchain. 
+In the backend we can use alchemy/infura to connect with the blockchain node[or run our own node] but in
+the front end we use users metamask to connect them to the blockchain node[metamask under the hood uses infura].
+All blockchain networks in metamask has a rpc url - infura in metamask
+
+so we need to connect our sc with the metamask so that users can interact with it
+
+How to code the logic to connect the smart contract with users wallet?
+
+In FE there will be a connect button that allows us to connect with the metamask account, execute button 
+to execute a txn in the metamask;
+
+So how this buttons work under the hood
+
+inspect > sources we'll see the metamask etc these are injected from the browser extension
+    when our browser has these extensions installed, they automatically get injected into a "window" object
+    in javascript 
+    ie in console type: window -> we can see all the window objects
+    type: window.ethereum -> returns an object if we have metamask installed
+    similarlly check other wallets if any
+
+## 6 methods to connect smartcontract to front end
+ 
+1. HTML & javascript
+2. NEXTJS / React and "Raw" ethers
+3. NEXTJS & "web3-react"
+4. NEXTJS & "react-moralis"
+5. NEXTJS & "web3Modal"
+6. NEXTJS & "useDapp"
+
+1. HTML & javascript
+    Create an index.js file and add the browser compatable js code here and export the function into html 
+
+    src="./index.js" type="text/javascript"
+
+    We need to check whether window.ethereum object exists
+        if exist - send a request to it to get the accounts
+
+    if (typeof window.ethereum !== "undefined") {
+      ethereum.request({ method: "eth_requestAccounts" });
+    } - Wrap this into a button
+
+    async function connect() {
+        if (typeof window.ethereum !== "undefined") { - we have a provider
+          await ethereum.request({ method: "eth_requestAccounts" }); - we have account to work with
+        }
+    }
+    <button id="connectButton" onclick="connect()">Connect</button>
+    <button id="executeButton" onclick="execute()">Execute</button>
+
+    Now we need another fn to execute transactions with the selected account
+        use ethersjs or web3js package to do these transactions
+        npm install --save-dev ethers
+
+        grab the ethers package
+
+        const {ethers} = require("ethers")
+
+    To execute a fn we need a
+      contract address, - npx hardhat node and deploy it to local http blockchain and get its address
+      contract ABI, - to interact and call fns in the smartcontract
+      function,
+      node connection - metamask
+
+## Whenever we want to interact/execute a fn in smartcontract we need 4 things:
+    1. The contractAddress - The address of the deployed contract tells js which is the contract to interact with
+
+    2. contract abi - While interacting the scripts/users needs to know which are the functions they can call or which
+                      are the public variables they can read from and so on. It’s a way of describing the interface of
+                      our contract. 
+                      Our script/user is interacting with the abi which tells our app what functions can be called, 
+                      how they can be called and what they return.
+
+    3. provider - To interact with blockchain we need access to a node. Since the contract is executed/run on our device instead 
+                  they run on EVM's on the blockchain, so we use node as a service provider platforms like Infuram, alchemy etc. 
+                  In the front the users use metamask[which uses infura under the hood to help us connect to the blockchain] 
+                  to interact with the smartcontract deployed on the blockchain. So metamask is the one providing users access so 
+                  its a provider. We access the provider in our javascript code via the window.ethereum.
+                  In backend to interact with a contract [ie Our apps backend should interact with blockchain to return data etc 
+                  from the blockchain] we need to connect with the blockchain so we need the same 4 things. Here in frontend the 
+                  provider will not be metamask it'll be alchemy or Infuram.
+
+    4. Signer - Once we get the provider [that connects users to blockchain] we need a signer to sign transactions like calling a 
+                function, writing data to blockchain etc since they require gas fees.
+                In front end the signer will be the connected account [connected via provider metamask]. In backend its mostly the 
+                person who deployed the contract. 
+
+## Project
+    npx hardhat node - first it spins up a fake blockchain in the terminal and it deploys the contracts
+    and it gives us a bunch of fake accounts
+    The fake blockchain node/ endpoint is running in our HTTP server 
+    - http://127.0.0.1:8545/ add this endpoint to metamask in new rpc url
+    chain id 31337, symbol ETH
+    - For this blockchain we have 20 fake accounts with fake eth import a account to metamask
+
+    Now we have address [we already have node connection]
+    Get abi of deployed contract from contracts json file in deployments
+
+    In the smartcontract there are public fns which we can call so we have a fn
+
+    Stick our provider metamask to ethers
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+        
+        provider is metamask aka window.ethereum, ie we are using this as our rpc url
+        we can also put the HTTP server rpc url, but we want to connect with users metamask, we want to connect
+        with whatever network they are working with we dont always wanna force them to our localhost blockchain
+
+    signer - when somebody execute a txn somebody needs to sign it
+
+    const signer = provider.getSigner();
+        This is going to get the connected account into our ethers
+
+    Now put provider and signer into a contract 
+        const contract = new ethers.Contract(contractAddress, abi, signer)
+            This means we're gonna be interacting with this contractAddress, using this abi, and any fn called
+            will be called by the signer
+            whoever connects() to the smart contract will be the signer and they are the one gonna call these fns
+
+    await contract.store(42); //calling the store fn and passing a parameter
+
+Now we can connect but when we try to execute the fn we'll get an error
+    ReferenceError: Cannot access 'ethers' before initialization
+    Uncaught ReferenceError: require is not defined
+
+    This is because the require stuff doesnt work in the browsers, so we need to browserify our javascript.
+    ie we need to take the index.js file and transpile it into a way that frontend can actually understand.
+
+        npm install -g browserify
+
+    To transpile index.js into browserified index.js - in git bash run :
+        npx browserify index.js --standalone bundle -o ./dist/bundle.js
+
+    Now in the html file change path to ./bundle.js and to execute a fn from bundle.js use dot(.) operator
+
+        <script src="./bundle.js" type="text/javascript"></script>
+        <button id="connectButton" onclick="bundle.connect()">Connect</button>
+
+Summary
+-firstly create a basic index.html file with buttons to connect and execute functions, run it in live server
+
+-Define the functions in the index.js file, a connect fn to check for an ethereum provider/ metamask and send a 
+response, an execute fn to execute a txn. 
+
+-To execute a blockchain transaction we need the contractAddress, abi, provider and signer.
+
+-Now run "npx hardhat node" this will compile the contract and deploy it to a local hardhat blockchain copy this
+deployed address into contractAddress, and the abi code will be present after compile, copy it as well.
+
+-Now define the provider using ethers[install ethers], once provider is defined we can get the signer using the 
+provider.getSigner();
+
+-Now define the contract using ethers.
+
+-Now call any public txn/fn.
+
+-Export both connect and execute fns.
+
+-Now if we try to connect it works but execute doesnt work cause the browser doesnt know require. 
+so we need to transpile our js file so browser can understand. Install browserify, transpile the js file.
+
+-Now go to the html file and change the path from index.js to bundle.js and since connect, execute fns are 
+now part of bundle use dot(.) operator along with bundle to access those fns in the html file.
+
+
+<----------------------------------------------------------------------------------------------------------->
+
+Nextjs is like react - run "npm run dev"
+
+We need to create 2 fns connect and execute - same way as in html-js-ethers
+Normal react would recognize window object but Nextjs wont so we need to do some workaround 
+
+#   Make a button that will only exist if we are not connected ie once we are connected the 
+    button should disappear so we need to save the state[ie whether connected or not] so later
+    we can use that state to determine whether to display the button or not - so use useState
+    const [isConnected, setIsConnected] = useState(false);
+        So now when we are connect change the state of setIsConnected to true
+
+    we can do let isConnected = false; and achieve the same but, 
+    Difference is useState help us to keep state between renders
+
+    inside the request method in connect()
+    setIsConnected(true); - we also use this connection to get a provider
+
+    So if setIsConnected is true we get the provider by:
+    let connectedProvider = new ethers.provider.web3Provider(window.ethereum); 
+
+    since now we have the provider we can get the signer as well:
+    setSigner(connectedProvider.getSigner());  
+        store the state of signer: 
+            const [signer, setSigner] = useState();
+            Since signer fn is not in the execute fn. when we click the execute fn the execute fn 
+            should know who the signer is so save it into a state. So now whenever the execute fn 
+            is called the fn knows who the signer is 
+        or
+            set the provider and signer inside the execute fn
+
+#   Now in the execute fn declare the contractAddress and abi. Then declare the contract 
+        const contract = new ethers.Contract(contractAddress, abi, signer);
+
+#   creating button for these functions
+        <button onClick={() => connect()}>connect</button>
+    
+    To only show the button if you are connected
+        {isConnected ? ("Connected!!") : (<button onClick={() => connect()}>connect</button>)}
+
+    To show only the execute button once we are connected
+        {isConnected ? (
+        <>
+          "Connected!!"
+          <button onClick={() => execute()}>execute</button>
+        </>
+      ) : (button onClick={() => connect()}>connect</button>)}
+
+Drawback is that when we switch pages we want the states to be saved like signer's etc and we dont want to clutter
+everything with more code so we use other packages
